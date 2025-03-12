@@ -6,6 +6,8 @@ import json
 import fitz  # PyMuPDF for PDFs
 import aiofiles
 import chardet
+import re
+from typing import List
 # import pytesseract # OCR for images
 
 from langchain_core import documents
@@ -26,6 +28,103 @@ from PIL import Image  # for images
 
 
 # Run setup.py to setup-dependencies
+class DocumentProcessor:
+    """Utility class for document processing operations"""
+    
+    @staticmethod
+    def detect_encoding(file_path: str) -> str:
+        """Simplified encoding detection for speed"""
+        encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'windows-1252']
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    f.read(1024)  # Just read a small portion to test
+                    return encoding
+            except UnicodeDecodeError:
+                continue
+        
+        # Default to latin-1 (will rarely fail)
+        return 'latin-1'
+    
+    @staticmethod
+    def convert_to_markdown_table(rows: List[List[str]]) -> str:
+        """Convert rows to a markdown table with optimized string operations"""
+        if not rows or len(rows) == 0:
+            return ""
+        
+        # Determine max columns
+        max_cols = max(len(row) for row in rows)
+        
+        # Make rows uniform length
+        normalized_rows = []
+        for row in rows:
+            if len(row) < max_cols:
+                normalized_rows.append(row + [''] * (max_cols - len(row)))
+            else:
+                normalized_rows.append(row)
+        
+        # Generate table efficiently
+        header = normalized_rows[0]
+        separator = ['---'] * len(header)
+        
+        # Pre-calculate row strings to avoid repeated string concatenation
+        markdown_lines = [
+            '| ' + ' | '.join(header) + ' |',
+            '| ' + ' | '.join(separator) + ' |'
+        ]
+        
+        for row in normalized_rows[1:]:
+            markdown_lines.append('| ' + ' | '.join(row) + ' |')
+        
+        return '\n'.join(markdown_lines)
+
+    @staticmethod
+    def text_to_markdown(text: str, source_type: str, filename: str) -> str:
+        """Convert plain text to properly formatted markdown - optimized for speed"""
+        # Quick structure analysis
+        lines = text.split('\n')
+        markdown_lines = [f"# {os.path.basename(filename)}"]
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Skip empty lines
+            if not line:
+                i += 1
+                continue
+            
+            # Quick header detection - uppercase lines under 100 chars
+            if len(line) < 100 and line.isupper():
+                level = 2 if len(line) < 50 else 3
+                markdown_lines.append(f"{'#' * level} {line}")
+                i += 1
+                continue
+            
+            # Quick list detection
+            if line.startswith(('•', '-', '*', '○', '·')):
+                clean_text = line[1:].strip()
+                markdown_lines.append(f"- {clean_text}")
+                i += 1
+                continue
+            
+            if re.match(r'^\d+[\.\)]', line):
+                clean_text = re.sub(r'^\d+[\.\)]\s*', '', line)
+                markdown_lines.append(f"1. {clean_text}")
+                i += 1
+                continue
+            
+            # Handle paragraphs - collect all consecutive non-empty lines
+            paragraph = [line]
+            j = i + 1
+            while j < len(lines) and lines[j].strip() and not lines[j].strip().isupper() and not lines[j].strip()[0:1] in ['•', '-', '*', '○', '·'] and not re.match(r'^\d+[\.\)]', lines[j].strip()):
+                paragraph.append(lines[j].strip())
+                j += 1
+            
+            markdown_lines.append(' '.join(paragraph))
+            i = j
+        
+        return '\n\n'.join(markdown_lines)
 
 # class that represents one unit of uploaded data that has been processed, uploaded data is a pdf, a picture, or
 # any other single unit, multiple
@@ -142,7 +241,6 @@ class Uploaded_data:
                     cells = row.split("\t")
                 else:
                     # Split by multiple spaces, but preserve single spaces within cells
-                    import re
                     cells = re.split(r'  +', row)
 
                 # Clean up cells (strip extra spaces)
@@ -151,7 +249,7 @@ class Uploaded_data:
             else:
                 # If we were in a table and now found non-table text, convert the table we've collected
                 if in_table and table_rows:
-                    markdown_table = self._convert_to_markdown_table(table_rows)
+                    markdown_table = DocumentProcessor._convert_to_markdown_table(table_rows)
                     markdown_tables.append(markdown_table)
                     in_table = False
 
@@ -180,55 +278,55 @@ class Uploaded_data:
 
         return extracted_texts
 
-    def _convert_to_markdown_table(self, table_rows):
-        """
-        Convert a list of cell rows into a Markdown table.
+    # def _convert_to_markdown_table(self, table_rows):
+    #     """
+    #     Convert a list of cell rows into a Markdown table.
 
-        Args:
-            table_rows: List of lists, where each inner list contains cells for a row
+    #     Args:
+    #         table_rows: List of lists, where each inner list contains cells for a row
 
-        Returns:
-            String containing a properly formatted Markdown table
-        """
-        if not table_rows or len(table_rows) == 0:
-            return ""
+    #     Returns:
+    #         String containing a properly formatted Markdown table
+    #     """
+    #     if not table_rows or len(table_rows) == 0:
+    #         return ""
 
-        # Determine the max number of columns
-        max_cols = max(len(row) for row in table_rows)
+    #     # Determine the max number of columns
+    #     max_cols = max(len(row) for row in table_rows)
 
-        # Make sure all rows have the same number of columns
-        normalized_rows = []
-        for row in table_rows:
-            if len(row) < max_cols:
-                # Pad with empty cells
-                normalized_rows.append(row + [''] * (max_cols - len(row)))
-            else:
-                normalized_rows.append(row)
+    #     # Make sure all rows have the same number of columns
+    #     normalized_rows = []
+    #     for row in table_rows:
+    #         if len(row) < max_cols:
+    #             # Pad with empty cells
+    #             normalized_rows.append(row + [''] * (max_cols - len(row)))
+    #         else:
+    #             normalized_rows.append(row)
 
-        # Create the markdown table
-        markdown_lines = []
+    #     # Create the markdown table
+    #     markdown_lines = []
 
-        # First row becomes the header
-        header = normalized_rows[0]
-        markdown_lines.append('| ' + ' | '.join(header) + ' |')
+    #     # First row becomes the header
+    #     header = normalized_rows[0]
+    #     markdown_lines.append('| ' + ' | '.join(header) + ' |')
 
-        # Add the separator row
-        markdown_lines.append('| ' + ' | '.join(['---'] * len(header)) + ' |')
+    #     # Add the separator row
+    #     markdown_lines.append('| ' + ' | '.join(['---'] * len(header)) + ' |')
 
-        # Add the data rows
-        for row in normalized_rows[1:]:
-            markdown_lines.append('| ' + ' | '.join(row) + ' |')
+    #     # Add the data rows
+    #     for row in normalized_rows[1:]:
+    #         markdown_lines.append('| ' + ' | '.join(row) + ' |')
 
-        return '\n'.join(markdown_lines)
+    #     return '\n'.join(markdown_lines)
 
-    ##### NEED TO AUTOMATE TESSERACT INSTALATION BEFORE IT CAN RUN #####
-    # def _process_image(self, image_path):
-    #     try:
-    #         image = Image.open(image_path)
-    #         text = pytesseract.image_to_string(image)
-    #         return [Document(page_content=text, metadata={"source": image_path})]
-    #     except Exception as e:
-    #         raise RuntimeError(f"Failed to process image {image_path}: {e}")
+    # ##### NEED TO AUTOMATE TESSERACT INSTALATION BEFORE IT CAN RUN #####
+    # # def _process_image(self, image_path):
+    # #     try:
+    # #         image = Image.open(image_path)
+    # #         text = pytesseract.image_to_string(image)
+    # #         return [Document(page_content=text, metadata={"source": image_path})]
+    # #     except Exception as e:
+    # #         raise RuntimeError(f"Failed to process image {image_path}: {e}")
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
@@ -242,15 +340,18 @@ class Uploaded_data:
             return [chunk for sublist in results for chunk in sublist]
 
     def _process_text(self, text_path):
-        with open(text_path, "r", encoding="utf-8") as f:
+        encoding = DocumentProcessor.detect_encoding(text_path)
+        with open(text_path, "r", encoding=encoding) as f:
             text = f.read()
-        return [Document(page_content=text, metadata={"source": text_path})]
+        formatted_text = DocumentProcessor.text_to_markdown(text, "text", text_path)
+        return [Document(page_content=formatted_text, metadata={"source": text_path})]
 
     def _process_word(self, word_path):
         try:
             doc = DocxDocument(word_path)
             text = "\n".join([p.text for p in doc.paragraphs])
-            return [Document(page_content=text, metadata={"source": word_path})]
+            formatted_text = DocumentProcessor.text_to_markdown(text, "text", word_path)
+            return [Document(page_content=formatted_text, metadata={"source": word_path})]
         except Exception as e:
             raise RuntimeError(f"Failed to process Word document {word_path}: {e}")
 
@@ -258,7 +359,8 @@ class Uploaded_data:
         try:
             prs = Presentation(pptx_path)
             text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
-            return [Document(page_content=text, metadata={"source": pptx_path})]
+            formatted_text = DocumentProcessor.text_to_markdown(text, "text", pptx_path)
+            return [Document(page_content=formatted_text, metadata={"source": pptx_path})]
         except Exception as e:
             raise RuntimeError(f"Failed to process PowerPoint file {pptx_path}: {e}")
 
@@ -272,17 +374,13 @@ class Uploaded_data:
             raise RuntimeError(f"Failed to process Excel file {excel_path}: {e}")
 
     async def _process_csv(self, csv_path):
-        with open(csv_path, "rb") as f:
-            raw_data = f.read()
-            result = chardet.detect(raw_data)
-            encoding = result["encoding"]
-        if encoding != "utf-8":
-            encoding = "utf-8"
+        encoding = DocumentProcessor.detect_encoding(csv_path)
         async with aiofiles.open(csv_path, "r", encoding=encoding, errors="replace") as f:
             text = await f.read()
         return [Document(page_content=text, metadata={"source": csv_path})]
 
     async def _process_json(self, json_path):
+        encoding = DocumentProcessor.detect_encoding(json_path)
         async with aiofiles.open(json_path, "r", encoding="utf-8") as f:
             text = await f.read()
         return [Document(page_content=text, metadata={"source": json_path})]
