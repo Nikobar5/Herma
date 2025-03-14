@@ -39,7 +39,6 @@ const Home: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [autoScroll, setAutoScroll] = useState(true);
-  const [userHasScrolled, setUserHasScrolled] = useState(false);
   const messageDisplayRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const [charCount, setCharCount] = useState(0);
@@ -74,12 +73,12 @@ const Home: React.FC = () => {
 
       // Clear input text
       setChatMessage("");
+      setCharCount(0);
 
       // Reset states
       setLoading(false);
       setIsStreaming(false);
       setAutoScroll(true);
-      setUserHasScrolled(false);
 
       // Clear messages
       setMessages([]);
@@ -109,8 +108,7 @@ const Home: React.FC = () => {
           const nearBottom = isNearBottom();
 
           // If user has scrolled away from bottom during streaming
-          if (!nearBottom && !userHasScrolled) {
-            setUserHasScrolled(true);
+          if (!nearBottom) {
             setAutoScroll(false);
           }
         }
@@ -120,7 +118,7 @@ const Home: React.FC = () => {
       return () => {
         messageDisplay.removeEventListener('scroll', handleScroll);
       };
-    }, [isStreaming, userHasScrolled]);
+    }, [isStreaming]);
 
     useEffect(() => {
       // When user sends a message, always scroll to bottom and reset scroll tracking
@@ -129,13 +127,25 @@ const Home: React.FC = () => {
   
       if (isNewUserMessage) {
         setAutoScroll(true);
-        setUserHasScrolled(false);
         scrollToBottom();
       } else if (autoScroll) {
         // For bot messages, only scroll if auto-scroll is still enabled
         scrollToBottom();
       }
     }, [messages, autoScroll]);
+
+    useEffect(() => {
+      // When selected files change, ensure input is enabled
+      const inputElement = document.querySelector('.chat-input') as HTMLTextAreaElement;
+      if (inputElement && !loading && !isStreaming) {
+        inputElement.disabled = false;
+        
+        // If in conversation mode, try to focus the input
+        if (hasStarted) {
+          inputElement.focus();
+        }
+      }
+    }, [selectedFiles, uploadedFiles]);
 
 const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
   const textarea = event.target;
@@ -150,19 +160,15 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
     setChatMessage(newText);
   } else if (isProbablyPaste) {
     // If it's a paste operation and exceeds limit, extract only the pasted content
+    setCharCount(-1);
+    setIsUploading(true);
     // Calculate what was pasted by finding the difference between new and old text
     const pastedContent = newText.substring(chatMessage.length);
+    const blob = new Blob([pastedContent], { type: 'text/plain' });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `paste_${timestamp}.txt`;
 
     try {
-      setIsUploading(true);
-
-      // Create a Blob from just the pasted content
-      const blob = new Blob([pastedContent], { type: 'text/plain' });
-
-      // Generate a unique filename with timestamp and random string
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `paste_${timestamp}.txt`;
-
       // Convert Blob to Buffer for Electron
       const arrayBuffer = await blob.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -192,6 +198,7 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
       console.error("Error handling paste:", error);
     } finally {
       setIsUploading(false);
+      setCharCount(chatMessage.length);
     }
   } else {
     // For normal typing that exceeds the limit, just truncate
@@ -241,7 +248,6 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
   // If this is the first chunk, set isStreaming to true
   if (!isStreaming) {
     setIsStreaming(true);
-    setUserHasScrolled(false);
     setAutoScroll(true);
   }
 
@@ -276,7 +282,7 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
     return () => {
       ipcRenderer.removeListener('chat-response', messageHandler);
     };
-  }, [autoScroll, isStreaming, userHasScrolled]);
+  }, [autoScroll, isStreaming]);
 
 const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (loading || isStreaming) {
@@ -410,16 +416,43 @@ const handleInterrupt = async () => {
   };
 
   const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
+    // Completely prevent event bubbling
+    e.preventDefault();
     e.stopPropagation();
-
+    
     if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
+        // First, remove the file from selectedFiles if it's there
+        const newSelectedFiles = selectedFiles.filter(f => f !== filename);
+        setSelectedFiles(newSelectedFiles);
+        
+        // Update the backend about the selection change
+        await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
+        
+        // Then delete the file
         await ipcRenderer.invoke('delete-file', { filename });
-        await fetchAndSelectFiles();
+        
+        // Refresh the file list
+        const files = await ipcRenderer.invoke('get-files');
+        setUploadedFiles(files);
+        
+        // Force React to re-render by updating a state
+        setChatMessage(prev => prev + ""); // This is a hack to trigger re-render
+        
+        // Force the chat input to be enabled and focused after a short delay
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false;
+            input.focus();
+          });
+        }, 200);
+        
       } catch (error) {
         console.error("Error deleting file:", error);
       }
     }
+    resetInputState();
   };
 
   useEffect(() => {
@@ -437,7 +470,6 @@ const handleSubmit = async (event: React.FormEvent) => {
   setIsStreaming(false); // Reset streaming state
   setChatMessage("");
   setHasStarted(true);
-  setUserHasScrolled(false);
   setAutoScroll(true);
 
   const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
@@ -469,6 +501,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSubmit(event);
+      setCharCount(0);
     }
   };
 
@@ -503,6 +536,28 @@ const handleSubmit = async (event: React.FormEvent) => {
     isVisible: boolean;
     onClose: () => void;
   }
+
+  const resetInputState = () => {
+    // Reset all input-related states
+    setIsUploading(false);
+    
+    // Force-enable all chat inputs
+    const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+    inputs.forEach(input => {
+      input.disabled = false;
+    });
+    
+    // Focus the appropriate input
+    setTimeout(() => {
+      const input = hasStarted 
+        ? document.querySelector('.chat-form .chat-input') 
+        : document.querySelector('.chat-form-centered .chat-input');
+      
+      if (input) {
+        (input as HTMLTextAreaElement).focus();
+      }
+    }, 100);
+  };
 
   const FileTypeAlert: React.FC<FileTypeAlertProps> = ({ isVisible, onClose }) => {
     if (!isVisible) return null;
@@ -686,15 +741,33 @@ const handleSubmit = async (event: React.FormEvent) => {
         onChange={handleChatInput}
         onKeyPress={handleKeyPress}
         className="chat-input"
-        disabled={loading || isUploading}
+        disabled={loading || (isUploading && !selectedFiles)}
         rows={1}
         style={{ height: 'auto' }}
+        onFocus={() => {
+          // Ensure the input is enabled when focused
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false;
+          });
+        }}
+        onClick={() => {
+          // Ensure the input is enabled when clicked
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false; 
+          });
+        }}
       />
-      {charCount > 0 && (
-                <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
-                  {charCount}/{MAX_CHARS}
-                </div>
-                )}
+      {charCount > 0 ? (
+        <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+          {charCount}/{MAX_CHARS}
+        </div>
+      ) : charCount === -1 ? (
+        <div className="char-count char-count-normal uploading-paste">
+          uploading paste...
+        </div>
+      ) : null}
     </div>
     <div className="chat-buttons-container">
               <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
@@ -764,7 +837,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="centered-start">
             <div className="chat-header">
               <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
-              <span className="center-title" contentEditable="true">HΞRMΛ</span>
+              <span className="center-title">HΞRMΛ</span>
             </div>
             {loading && <div className="loading">Loading...</div>}
             <form className="chat-form-centered" onSubmit={handleSubmit}>
@@ -779,11 +852,15 @@ const handleSubmit = async (event: React.FormEvent) => {
                     rows={1}
                     style={{ height: 'auto' }}
                   />
-                {charCount > 0 && (
-                  <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
-                    {charCount}/{MAX_CHARS}
-                  </div>
-                )}
+                  {charCount > 0 ? (
+                    <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+                      {charCount}/{MAX_CHARS}
+                    </div>
+                  ) : charCount === -1 ? (
+                    <div className="char-count char-count-normal uploading-paste">
+                      uploading paste...
+                    </div>
+                  ) : null}
               </div>
                     <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
                            data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>
