@@ -148,6 +148,11 @@ const Home: React.FC = () => {
     }, [selectedFiles, uploadedFiles]);
 
 const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  if (isUploading) {
+    event.preventDefault();
+    return;
+  }
+
   const textarea = event.target;
   const newText = event.target.value;
 
@@ -328,6 +333,11 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
   }
 
   setIsUploading(true);
+  const textareas = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+  textareas.forEach(input => {
+    input.disabled = true;
+  });
+
   try {
     const buffer = await file.arrayBuffer();
 
@@ -351,6 +361,14 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
   } finally {
     setIsUploading(false);
     event.target.value = ''; // Clear the file input
+
+    textareas.forEach(input => {
+      input.disabled = false;
+    });
+
+    if (textareas.length > 0) {
+      textareas[0].focus();
+    }
   }
 };
 
@@ -458,6 +476,16 @@ const handleInterrupt = async () => {
   useEffect(() => {
     fetchAndSelectFiles();
   }, []);
+
+  useEffect(() => {
+    // This effect runs when isUploading state changes
+    const textareas = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+    
+    textareas.forEach(input => {
+      // Disable when uploading, but ensure we consider loading and streaming states too
+      input.disabled = isUploading || loading || isStreaming;
+    });
+  }, [isUploading, loading, isStreaming]);
 
 const handleSubmit = async (event: React.FormEvent) => {
   event.preventDefault();
