@@ -15,7 +15,7 @@ from langchain.schema.document import Document
 from get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
 from concurrent.futures import ThreadPoolExecutor
-# from langchain_community.document_loaders.pdf import PyPDFLoader
+from langchain_community.document_loaders.pdf import PyPDFLoader
 # from langchain_community.document_loaders.pdf import PyPDFDirectoryLoader
 from langchain_community.document_loaders.text import TextLoader
 from docx import Document as DocxDocument
@@ -23,6 +23,7 @@ from pptx import Presentation
 from pathlib import Path
 import time
 from PIL import Image  # for images
+import re
 
 
 # Run setup.py to setup-dependencies
@@ -95,21 +96,28 @@ class Uploaded_data:
             raise RuntimeError(f"Failed to load documents from {data_path}: {e}")
 
     def _process_pdf(self, pdf_path):
-        documents = []
-        doc = fitz.open(pdf_path)
-
-        for i, page in enumerate(doc):
-            text = page.get_text("text")
-            table_text = self._extract_tables_from_pdf(page)
-            combined_text = f"{text}\n\nTables:\n{table_text}" if table_text else text
-
-            documents.append(Document(page_content=combined_text, metadata={"source": pdf_path, "page": i + 1}))
-            # Processing images still in the works, uncomment when functionality is finished
-            # images = self._extract_images_from_pdf(page)
-            # for img_text, img_meta in images:
-            #     documents.append(Document(page_content=img_text, metadata=img_meta))
-
+        loader = PyPDFLoader(pdf_path)
+        documents = loader.load()
+    
+        for doc in documents:
+            doc.page_content = self._convert_text_to_markdown(doc.page_content)
+    
         return documents
+        # documents = []
+        # doc = fitz.open(pdf_path)
+
+        # for i, page in enumerate(doc):
+        #     text = page.get_text("text")
+        #     table_text = self._extract_tables_from_pdf(page)
+        #     combined_text = f"{text}\n\nTables:\n{table_text}" if table_text else text
+
+        #     documents.append(Document(page_content=combined_text, metadata={"source": pdf_path, "page": i + 1}))
+        #     # Processing images still in the works, uncomment when functionality is finished
+        #     # images = self._extract_images_from_pdf(page)
+        #     # for img_text, img_meta in images:
+        #     #     documents.append(Document(page_content=img_text, metadata=img_meta))
+
+        # return documents
 
     def _extract_tables_from_pdf(self, page):
         """
@@ -180,6 +188,41 @@ class Uploaded_data:
                 (img_text[0].page_content, {"source": page.parent.name, "page": page.number + 1, "type": "image"}))
 
         return extracted_texts
+
+    def _convert_text_to_markdown(self, text):
+        """Convert plain text to basic markdown format"""
+        # Split into lines
+        lines = text.split('\n')
+        markdown_lines = []
+        
+        for i, line in enumerate(lines):
+            # Skip empty lines
+            if not line.strip():
+                markdown_lines.append('')
+                continue
+                
+            # Detect headings (all caps or numbered sections often indicate headings)
+            if line.isupper() or re.match(r'^\d+\.(\d+\.)*\s+', line):
+                # Determine heading level based on indentation or numbering depth
+                heading_level = 2  # Default to h2
+                if re.match(r'^\d+\.\s+', line):  # Top level numbered heading
+                    heading_level = 2
+                elif re.match(r'^\d+\.\d+\.\s+', line):  # Second level
+                    heading_level = 3
+                
+                markdown_lines.append('#' * heading_level + ' ' + line)
+                continue
+                
+            # Detect lists
+            if re.match(r'^\s*[\•\-\*]\s+', line):  # Bullet list
+                markdown_lines.append(line)
+            elif re.match(r'^\s*\d+\.\s+', line):  # Numbered list
+                markdown_lines.append(line)
+            else:
+                # Regular paragraph
+                markdown_lines.append(line)
+        
+        return '\n'.join(markdown_lines)
 
     def _convert_to_markdown_table(self, table_rows):
         """
