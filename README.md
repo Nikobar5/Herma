@@ -1,9 +1,7 @@
 # Herma
 
-**The AI Assistant That Answers to You, Not Big Tech**
+**AI That Protects Your Data**
 
-[Download & Learn More](https://hermahq.com) • [Documentation](#) •
-[Community](#)
 
 ---
 
