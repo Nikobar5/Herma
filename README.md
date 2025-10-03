@@ -137,6 +137,7 @@ Markdown, and more
 
 **Healthcare:** Analyze patient records on-device, summarize public
 research with cloud speed
+
 **Finance:** Model proprietary strategies locally, research market trends
 via cloud
 
@@ -166,20 +167,9 @@ different tools. Stop second-guessing every query.
 Governor mode doesn't just blindly route traffic—it applies *your* rules
 with precision. Set your boundaries once. Work with confidence forever.
 
-### Privacy Without Paranoia
-We're not anti-cloud. We're anti-*forced*-cloud. Sometimes speed matters
-more than privacy. Sometimes privacy is non-negotiable. You decide. Every
-time.
-
 ---
 
 ## The Herma Philosophy
-
-**Autonomy Through Intelligence**
-
-We believe AI should amplify your agency, not exploit your ignorance.
-Every feature, every design decision, every line of code serves one
-principle: **you are in control**.
 
 - **Transparent by design:** You know exactly where your data goes
 - **Local-first architecture:** Privacy is the default, not an
@@ -189,15 +179,13 @@ design
 - **Open about limitations:** Governor mode is experimental—we tell you
 that upfront
 
-**This is AI that answers to you.**
-
 ---
 
 ## Getting Started
 
 ### Installation & Download
 
-Visit [hermahq.com](https://hermahq.com) to download Herma for your
+Visit https://hermaai.com/#/ to download Herma for your
 platform (Windows, macOS, Linux).
 
 ### Quick Start
@@ -216,28 +204,6 @@ automatically
 (Local/Governor modes)
 - Internet connection required for initial setup and Cloud/Governor modes
 - No internet needed for pure Local mode operation
-
----
-
-## Roadmap
-
-**Coming Soon:**
-- Mobile companion app (view-only mode for on-the-go access)
-- Team collaboration features with shared privacy constitutions
-- Advanced constitution rules (regex patterns, custom classifications)
-- Integration with enterprise SSO providers
-- API access for developers
-- Self-hosted cloud model option for organizations
-
----
-
-## Community & Support
-
-- **Documentation:** [docs.hermahq.com](#)
-- **Discord Community:** [discord.gg/herma](#)
-- **Email Support:** support@hermahq.com
-- **Feature Requests:** [github.com/hermahq/herma/issues](#)
-- **Twitter/X:** [@HermaHQ](#)
 
 ---
 
@@ -275,15 +241,14 @@ location changes.
 
 ## License
 
-Herma is proprietary software. See [LICENSE](#) for details.
+Herma is proprietary software. See [LICENSE]([#](https://hermaai.com/#/privacy-policy)) for details.
 
 ---
 
 ## Contact
 
-**Website:** [hermahq.com](https://hermahq.com)
-**Email:** hello@hermahq.com
-**Support:** support@hermahq.com
+**Website:** https://hermaai.com/#/
+**Email:** hermalocal@gmail.com
 
 ---
 
