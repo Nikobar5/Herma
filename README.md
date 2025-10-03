@@ -134,34 +134,21 @@ Markdown, and more
 ### For Professionals Who Can't Compromise
 
 **Legal:** Draft client documents locally, research case law in the cloud
+
 **Healthcare:** Analyze patient records on-device, summarize public
 research with cloud speed
 **Finance:** Model proprietary strategies locally, research market trends
 via cloud
+
 **Consulting:** Keep client work confidential, leverage AI for general
 business tasks
+
 **Engineering:** Protect intellectual property while accessing powerful
 coding assistance
+
 **Research:** Analyze sensitive datasets locally, synthesize public
 literature in the cloud
 
----
-
-## Business Model
-
-### HΞRMΛ Free
-- Full access to all three modes (Local, Governor, Cloud)
-- Up to 5 uploaded files
-- Community support
-- Perfect for individual users exploring privacy-first AI
-
-### HΞRMΛ Pro
-- Unlimited file uploads
-- Priority support
-- Early access to new features
-- Support the development of privacy-respecting AI tools
-
-[Get Started Free](https://hermahq.com)
 
 ---
 
