@@ -241,7 +241,7 @@ location changes.
 
 ## License
 
-Herma is proprietary software. See [LICENSE]([#](https://hermaai.com/#/privacy-policy)) for details.
+Herma is proprietary software. See [LICENSE](https://hermaai.com/#/privacy-policy) for details.
 
 ---
 
