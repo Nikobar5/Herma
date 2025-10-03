@@ -248,18 +248,8 @@ Herma is proprietary software. See [LICENSE]([#](https://hermaai.com/#/privacy-p
 ## Contact
 
 **Website:** https://hermaai.com/#/
+
 **Email:** hermalocal@gmail.com
 
 ---
-
-<p align="center">
-  <strong>HΞRMΛ</strong><br>
-  Your Rules. Your Data. Your AI.
-</p>
-
-<p align="center">
-  <a href="https://hermahq.com">Download Now</a> •
-  <a href="#">Documentation</a> •
-  <a href="#">Join Discord</a>
-</p>
 
